@@ -1,5 +1,7 @@
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStreamReader;
 
 import constants.TCPConstants;
 
@@ -12,6 +14,16 @@ public class Server {
             return;
         }
 
-        UDP
+        UDPProvider.start(TCPConstants.PORT_SERVER);
+
+        BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(System.in));
+        String str;
+        do{
+            str = bufferedReader.readLine();
+            tcpServer.broadcast(str);
+        }while (!"00bye00".equalsIgnoreCase(str));
+
+        UDPProvider.stop();
+        tcpServer.stop();
     }
 }

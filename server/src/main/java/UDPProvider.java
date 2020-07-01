@@ -2,9 +2,26 @@ import constants.UDPConstants;
 
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
+import java.nio.ByteBuffer;
+import java.util.UUID;
 
 public class UDPProvider {
-    private static Provider
+    private static Provider PROVIDER_INSTANCE;
+
+    static void start(int port){
+        stop();
+        String sn = UUID.randomUUID().toString();
+        Provider provider = new Provider(sn,port);
+        provider.start();
+        PROVIDER_INSTANCE = provider;
+    }
+
+    static void stop(){
+        if (PROVIDER_INSTANCE!=null){
+            PROVIDER_INSTANCE.exit();
+            PROVIDER_INSTANCE=null;
+        }
+    }
 
     private static class Provider extends Thread{
         private final byte[] sn;
@@ -34,9 +51,51 @@ public class UDPProvider {
                     int clientPort = receivePack.getPort();
                     int clientDataLen = receivePack.getLength();
                     byte[] clientData = receivePack.getData();
-                    boolean isValid = clientData>=(UDPConstants.HEADER.length+2+4)&&
+                    boolean isValid = clientDataLen >= (UDPConstants.HEADER.length+2+4)&&ByteUtils.startsWith(clientData,UDPConstants.HEADER);
+
+                    System.out.println("UDPProvider receive from ip:"+clientIP+"\tport:"+clientPort+"\tdataValid:"+isValid);
+
+                    if (!isValid){
+                        continue;
+                    }
+
+                    int index = UDPConstants.HEADER.length;
+                    short cmd = (short)((clientData[index++]<<8)|(clientData[index++]&0xff));
+                    int responsePort = (((clientData[index++])<<24)|((clientData[index++]&0xff)<<16)|((clientData[index++]&0xff)<<8)|(clientData[index]&0xff));
+
+                    if (cmd == 1 && responsePort > 0){
+                        ByteBuffer byteBuffer = ByteBuffer.wrap(buffer);
+                        byteBuffer.put(UDPConstants.HEADER);
+                        byteBuffer.putShort((short)2);
+                        byteBuffer.putInt(port);
+                        byteBuffer.put(sn);
+                        int len = byteBuffer.position();
+
+                        DatagramPacket responsePacket = new DatagramPacket(buffer,len,receivePack.getAddress(),responsePort);
+                        ds.send(responsePacket);
+                        System.out.println("UDPProvider response to:"+clientIP+"\tport:"+responsePort+"\tdataLen:"+len);
+                    }else {
+                        System.out.println("UDPProvider receive cmd nonsupport;cmd"+cmd+"\tport:"+port);
+                    }
                 }
+            }catch (Exception ignored){
+            }finally {
+                close();
             }
+
+            System.out.println("UDPProvider Finished.");
+        }
+
+        private void close(){
+            if (ds!=null){
+                ds.close();
+                ds = null;
+            }
+        }
+
+        void exit(){
+            done = true;
+            close();
         }
     }
 }

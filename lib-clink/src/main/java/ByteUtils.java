@@ -1,5 +1,5 @@
 public class ByteUtils {
-    public static boolean startWith(byte[] source,byte[] match){
+    public static boolean startsWith(byte[] source,byte[] match){
         return startsWith(source,0,match);
     }
     public static boolean startsWith(byte[] source,int offset,byte[] match){
